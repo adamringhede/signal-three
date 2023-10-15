@@ -1,7 +1,8 @@
 import { Signal, computed, effect, signal } from '@adamringhede/signal';
 import './style.css'
 import * as THREE from 'three';
-import { ComponentElement, traverseComponents } from '../../src'
+import { ComponentElement, traverseComponents } from '../../src/traverse'
+import { defineContext } from '../../src'
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
@@ -30,7 +31,6 @@ animate()
 
 const opacity = signal(0.5)
 const color = signal(0xfff000)
-let contextKey = 0
 
 const position = signal(new THREE.Vector3())
 
@@ -90,40 +90,59 @@ function MyComponent(): ComponentElement {
   })
 
   return [
-    mesh
+    withRotation(Container([mesh]), signal(new THREE.Euler(0,0,Math.PI/4)))
   ]
 }
 
-// TODO Test that this actually works.
-// Not loving how complex this is though
-// I am very unsure about nesting computed like this
-// Like, it should work but I am not sure if may result in a memory leak
-// I don't think this handles all cases.
-// Would I not need an effect to add to parents?
-// If this does work, I could maybe replace the other traverse children function.
-// I think the problem with this is that it will not care about signals
-// updating. It would never update the references to groups.
-function Grouped(objects: ComponentElement[]): Signal<THREE.Group> {
-  return computed(() => {
-    const group = new THREE.Group()
-    for (const obj of objects) {
-      if (obj instanceof Array) {
-        group.add(Grouped(obj)())
-      } else if (typeof obj === 'function') {
-        const o = obj() 
-        if (o instanceof THREE.Object3D) { 
-          group.add(o)
-        } else {
-          // It is ComponentElement[]
-          group.add(Grouped(o)())
-        }
-        
-      } else if (obj instanceof THREE.Object3D) {
-        group.add(obj)
-      }
-    }
-    return group;
+// A problem with containers can be that they are currently setting up 
+
+function getRef(comp: ComponentElement): THREE.Object3D {
+  if (comp instanceof Array) {
+    return Container(comp)
+  } else if (typeof comp === 'function') {
+    return comp()
+  } else {
+    return comp
+  }
+}
+
+function withPosition(comp: ComponentElement, position: Signal<THREE.Vector3>): ComponentElement {
+  effect(() => {
+    getRef(comp).position.copy(position())
   })
+  return comp
+}
+
+function withRotation(comp: ComponentElement, rotation: Signal<THREE.Euler>): ComponentElement {
+  effect(() => {
+    getRef(comp).rotation.copy(rotation())
+  })
+  return comp
+}
+
+function withScale(comp: ComponentElement, scale: Signal<THREE.Vector3>): ComponentElement {
+  effect(() => {
+    getRef(comp).scale.copy(scale())
+  })
+  return comp
+}
+
+type TransformSignal = {
+  rotation: Signal<THREE.Euler>
+  position: Signal<THREE.Vector3>
+  scale: Signal<THREE.Vector3>
+} 
+function withTransform(comp: ComponentElement, { rotation, scale, position }: TransformSignal) {
+  withPosition(comp, position)
+  withRotation(comp, rotation)
+  withScale(comp, scale)
+  return comp
+}
+
+function Container(objects: ComponentElement): THREE.Group {
+  const group = new THREE.Group()
+  traverseComponents(objects, group)
+  return group 
 }
 
 
@@ -131,37 +150,6 @@ type TestContext = {
   foo: Signal<number>
 }
 
-const contextStack: Record<string, unknown[]> = {}
-
-function defineContext<T>() {
-  const key = (++contextKey).toString()
-  return {
-    provideContext<R>(value: T, fn: () => R): R {
-      return _provideContext(key, value, fn)
-    },
-    getContext(): T {
-      return _getContext<T>(key)
-    }
-  }
-}
-
-function _provideContext<T, R>(key: string, ctx: T, fn: () => R) {
-  if (contextStack[key] == null) {
-    contextStack[key] = []
-  }
-  contextStack[key].push(ctx)
-  // This only works because the functions are not async
-  const result = fn()
-  contextStack[key].pop()
-  return result
-} 
-
-function _getContext<T>(key: string): T {
-  if (contextStack[key] == null || contextStack[key].length == 0) {
-    throw Error(`No context provided for key ${key}`)
-  }
-  return contextStack[key][contextStack[key].length-1] as T
-}
 
 const shouldShow = signal(true)
 function ParentComponent(): ComponentElement {
@@ -179,7 +167,7 @@ setInterval(() => {
   color.update(v => 0xffffff * Math.random())
   //opacity.update(v => v += 0.01)
   //position.update(p => { return new THREE.Vector3(1,0,0).add(p) })
-  //shouldShow.update(v => !v)
+  shouldShow.update(v => !v)
 }, 1000)
 
 
@@ -212,6 +200,26 @@ setInterval(() => {
  * based on the physics body. 
  * 
  * The properties of the physics body could also be changed with signals and effects
+ * 
+ * 
+ * How to handle input
+ * 
+ * If you want to make an object clickable,
+ * create a raycaster somewhere in a context.
+ * 
+ * Register your object as some sort of target.
+ * In your single location for the raycaster, look at that object as a potential target.
+ * The raycaster should only have a weak reference though as that object may be removed in the future.
+ * This can be dangerous. It would be important to somehow deregister event listeners.
+ * Maybe computed and effects should be able to provide a cleanup function.
+ * Whenever an effect is destroyed, it should call cleanups. 
+ * 
+ * https://angular.io/guide/signals#effect-cleanup-functions
+ * 
+ * I still need to ensure that the effect gets destroyed which I am not sure if it will right now.
+ * 
+ * This is realistically only possible by having some global thing that can collect all calls to effect. 
+ * I would need a wrapper in my library for this.
  * 
  */
 

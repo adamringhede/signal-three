@@ -28,7 +28,7 @@
     "clean": true
   },
   "dependencies": {
-    "@adamringhede/signal": "^1.0.2",
+    "@adamringhede/signal": "^1.0.3",
     "three": "^0.157.0"
   }
 }

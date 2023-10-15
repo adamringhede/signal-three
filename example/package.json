@@ -13,7 +13,7 @@
     "vite": "^4.4.5"
   },
   "dependencies": {
-    "@adamringhede/signal": "^1.0.2",
+    "@adamringhede/signal": "^1.0.3",
     "@types/three": "^0.157.0",
     "three": "^0.157.0"
   }
