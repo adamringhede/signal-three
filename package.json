@@ -1,0 +1,34 @@
+{
+  "name": "signal-three",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adamringhede/signal.git"
+  },
+  "scripts": {
+    "build": "tsup --dts",
+    "test": "vitest run",
+    "start": "vitest"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "tsup": "^7.1.0",
+    "typescript": "^5.0.2",
+    "vitest": "^0.34.6"
+  },
+  "tsup": {
+    "entry": [
+      "src/index.ts"
+    ],
+    "splitting": false,
+    "sourcemap": true,
+    "clean": true
+  },
+  "dependencies": {
+    "@adamringhede/signal": "^1.0.2",
+    "three": "^0.157.0"
+  }
+}

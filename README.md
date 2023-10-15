@@ -96,3 +96,8 @@ function Root() {
     return Basket(containsBall)
 }
 ```
+
+
+
+What about shared services and such? Like maybe a service to connect 
+to an API. Want to share state with components further down.
